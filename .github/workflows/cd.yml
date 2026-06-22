@@ -1,0 +1,54 @@
+name: CD
+
+# PR が main にマージ（= main への push）されたときにデプロイする。
+# 直接の main push はブランチ保護で禁止し、必ず PR 経由にする。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC で AWS ロールを assume するために必須
+  contents: read
+
+jobs:
+  deploy:
+    name: build & cdk deploy (ap-northeast-1)
+    runs-on: ubuntu-latest
+    environment: production
+    # OIDC ロール（repo variable）未設定なら deploy をスキップする。
+    # → AWS 側（OIDC ロール / bootstrap）整備前に main へマージしても失敗にならない。
+    if: ${{ vars.AWS_DEPLOY_ROLE_ARN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build (tsup)
+        run: pnpm build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-1
+
+      - name: CDK deploy
+        run: pnpm exec cdk deploy --require-approval never
