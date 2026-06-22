@@ -1,16 +1,13 @@
 name: Verify Deploy (dry-run)
 
-# デプロイ経路の事前検証（デプロイはしない）。
+# デプロイ経路の事前検証（手動実行のみ・デプロイはしない）。
 # OIDC ロール assume → STS 確認 → cdk diff まで通すことで、
 # 本番 deploy 前に「認証・権限・bootstrap・synth」が正しいかを安全に確かめる。
 #
-# pull_request: 初回検証を PR #1 上で自動実行するための一時トリガ。
-#   environment:production を宣言しているため OIDC sub は
-#   repo:sori883/evo-testapp:environment:production となり、ロールの信頼ポリシーと一致する。
-#   検証が済んだら pull_request は外し、workflow_dispatch 限定（手動）に戻す想定。
+# environment:production を宣言しているため OIDC sub は
+# repo:sori883/evo-testapp:environment:production となり、ロールの信頼ポリシーと一致する。
+# default ブランチ（main）にこのファイルが載った後、Actions タブから手動実行できる。
 on:
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
