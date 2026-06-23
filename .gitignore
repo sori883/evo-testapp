@@ -1,0 +1,20 @@
+.DS_Store
+
+# dependencies
+node_modules/
+
+# build output
+dist/
+cdk.out/
+*.tsbuildinfo
+
+# test / coverage
+coverage/
+
+# logs
+*.log
+
+# local env / secrets (never commit)
+.env
+.env.*
+!.env.example

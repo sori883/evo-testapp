@@ -1,0 +1,55 @@
+name: Verify Deploy (dry-run)
+
+# デプロイ経路の事前検証（手動実行のみ・デプロイはしない）。
+# OIDC ロール assume → STS 確認 → cdk diff まで通すことで、
+# 本番 deploy 前に「認証・権限・bootstrap・synth」が正しいかを安全に確かめる。
+#
+# environment:production を宣言しているため OIDC sub は
+# repo:sori883/evo-testapp:environment:production となり、ロールの信頼ポリシーと一致する。
+# default ブランチ（main）にこのファイルが載った後、Actions タブから手動実行できる。
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC で AWS ロールを assume するために必須
+  contents: read
+
+jobs:
+  verify:
+    name: assume role & cdk diff (no deploy)
+    runs-on: ubuntu-latest
+    # environment:production を宣言することで OIDC sub が
+    # repo:sori883/evo-testapp:environment:production となり、ロールの信頼ポリシーと一致する。
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (tsup)
+        run: pnpm build
+
+      - name: Configure AWS credentials (OIDC)
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-1
+
+      - name: Who am I (STS)
+        run: aws sts get-caller-identity
+
+      - name: CDK diff (no deploy)
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ steps.creds.outputs.aws-account-id }}
+        run: pnpm exec cdk diff
